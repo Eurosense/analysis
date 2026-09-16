@@ -1,0 +1,145 @@
+@controls {
+  toolbar: click;
+
+  top {
+    title {
+      value: "Estuarine Mapping";
+    }
+
+    showcase {
+      target: :not(#background);
+      by: "element type";
+      as: buttons;
+      multiple: true;
+      default: show-all;
+    }
+
+    showcase {
+      target: element;
+      by: "level";
+      as: buttons;
+      multiple: true;
+      default: show-all;
+    }
+  }
+
+  bottom {
+    filter {
+      target: connection;
+      by: "connection type";
+      as: dropdown;
+      placeholder: "connections";
+      multiple: true;
+      default: show-all;
+    }
+
+    showcase {
+      target: element;
+      by: "priority";
+      as: dropdown;
+      placeholder: " priority";
+      multiple: true;
+      default: show-all;
+      mode: normal;
+    }
+  }
+}
+
+@settings {
+  direct-decorations: false;
+  layout: static;
+}
+
+element {
+  size: 70;
+  font-size: 30;
+  font-style: bold;
+  text-align: center;
+  icon-color: lightgrey;
+  shape: hexagon;
+  border-width: 0;
+  border-color: none;
+  popover: "**{{label}}**  {{image}}  {{description}}  {{energy}} / {{time}}  **Stories : ** {{titles of related stories}}   **Author : ** {{author}}   **Levels : ** {{level}} ";
+}
+
+connection {
+  popover: "  **{{Connection Type}}**   {{label}} {{description}}  {{To}}";
+  text-align: bottom;
+  size: 2;
+  color: black;
+}
+
+/* connections:  */
+[Priority="Medium"] {
+  border-width: 2;
+}
+
+[Priority="High"] {
+  border-width: 6;
+}
+
+/* Actor */
+["Element Type"="actor"] {
+  color: wheat;
+  icon: user;
+  border-color: green;
+}
+
+["Element Type"="action"] {
+  color: salmon;
+  icon: arrow-circle-right;
+  border-color: orange;
+}
+
+["Element Type"="constraint"] {
+  color: yellow;
+  icon: gg;
+  border-color: yellow;
+}
+
+["Element Type"="constructor"] {
+  color: deepskyblue;
+  icon: wrench;
+  border-color: blue;
+}
+
+["Element Type"="role"] {
+  color: #ffecae;
+  icon: Authorbs-LLM  border-color: orange;
+}
+
+["Author"="LLM"] {
+  border-width: 2;
+  border-color: blue;
+}
+
+element["label"="background"] {
+  image-url: url(https://s3.amazonaws.com/cloud.kumu.io/accounts/190867/1061912/bcbd431b-1595-429b-8f14-aff0aee6aec9.jpg);
+}
+
+["Connection Type"="opposes"] {
+  size: 4;
+  color: red;
+}
+
+["Connection Type"="promotes"] {
+  size: 4;
+  color: green;
+}
+
+["Connection Type"="related to"] {
+  size: 4;
+  color: grey;
+}
+
+#background {
+  layer: background;
+  shape: rectangle;
+  height: 3000;
+  width: 3000;
+  color: transparent;
+  image-size: contain;
+  image-resolution: original;
+  label-visibility: none;
+}
+
