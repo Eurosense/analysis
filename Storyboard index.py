@@ -8,11 +8,15 @@ Create a storyboard with an index of stories
 
 """
 import pandas as pd
+from datetime import date
 
 # Load the CSV file into a pandas DataFrame
-stories = "../GitClone-stories"  # where is the stories repo cloned to */
-file_path = stories + "/2026.06.08/CSVExport-2026.06.08_chargediandDigicomEURAI.csv"
-# file_path = "./cca+climate/cca+climate.csv"
+#stories = "../GitClone-stories"  # where is the stories repo cloned to */
+#file_path = stories + "/2026.06.08/CSVExport-2026.06.08_chargediandDigicomEURAI.csv"
+
+stories = "."  # where is the stories repo cloned to */
+file_path = stories + "/Orange/FoodRelatedStories.csv"
+
 df = pd.read_csv(file_path)
 
 
@@ -29,7 +33,8 @@ category_columns = [col for col in df.columns if col.startswith(category_prefix)
 # Create a dictionary to hold stories by cat
 cat_stories = {}
 
-
+generated_date = date.today().isoformat()
+print(f"Generated on: {generated_date}")
 
 # Populate the dictionary
 for category_col in category_columns:
@@ -71,6 +76,7 @@ print(f"\nTotal number of category assignments: {total_cat_assignments}")
 # Save  stories to a file
 with open("stories.md", "w", encoding="utf-8") as f:
     f.write("Storyboard \n\n")
+    f.write(f"Generated on: {generated_date}\n\n")
     f.write(f"Unique stories found: {len(story_ids)}\n\n")
     f.write(f"Total number of category assignments: {total_cat_assignments}\n\n")
 
