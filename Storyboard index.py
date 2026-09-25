@@ -9,14 +9,14 @@ from html import escape
 import pandas as pd
 
 stories = "../GitClone-stories"
-file_path = stories + "/2026.06.08/CSVExport-2026.06.08_translated.csv"
-original_file_path = stories + "/2026.06.08/CSVExport-2026.06.08_d1c06283-3a51-4050-ac6d-ea29ae75f32c (1).csv"
+#file_path = stories + "/2026.06.08/CSVExport-2026.06.08_translated.csv"
+file_path = "/mnt/chromeos/shared/GoogleDrive/SharedDrives/PROGETTI VARI/R extraction of stories/Protein transition/FoodRelatedStories.csv"
 output_dir = "storyboard_output"
+
 df = pd.read_csv(file_path)
-original_df = pd.read_csv(original_file_path)
 
 selected_categories = []
-selected_countries = ['Italy']
+selected_countries = []
 selected_ids = []
 category_prefix = '1.2 What you described relates mainly to...(pick up to three)_'
 country_prefix = '6.4 My experience is from..._'
@@ -102,7 +102,7 @@ def save_histogram(values, sentiments, title, output_path, labels, left_label=No
             ticks.append(line_max)
         right_axis = ''.join(f'<text x="{right + 14}" y="{axis_y - (axis_y - top) * tick / line_max + 5:.2f}" fill="#111827">{tick}</text>' for tick in ticks)
         right_axis = f'<path d="M {right} {top} L {right} {axis_y}" stroke="#111827" />{right_axis}<text x="{right + 42}" y="{top - 18}" text-anchor="middle" fill="#111827">Absolute count</text>'
-    labels_svg = ''.join(f'<text x="{left + (index + .5) * bar_width:.2f}" y="{axis_y + 28}" text-anchor="middle" transform="rotate(35 {left + (index + .5) * bar_width:.2f} {axis_y + 28})">{escape(str(label))} ({count_values[index] if show_counts and count_values is not None else ""})</text>' for index, label in enumerate(labels))
+    labels_svg = ''.join(f'<text x="{left + (index + .5) * bar_width:.2f}" y="{axis_y + 28}" text-anchor="middle" transform="rotate(35 {left + (index + .5) * bar_width:.2f} {axis_y + 28})">{escape(str(label))}</text>' for index, label in enumerate(labels))
     legend = ''.join(f'<text x="{760 + index * 75}" y="{axis_y + 115}" fill="{color}">{group.title()}</text>' for index, (group, color) in enumerate(SENTIMENT_COLORS.items()))
     limit_svg = ''
     if left_label and right_label:
@@ -145,7 +145,55 @@ def save_one_hot_histogram(dataframe, prefix, title, output_path, as_percentage=
     values = [next((label for column, label in zip(columns, labels) if row[column] == 1), 'Unknown') for _, row in dataframe[columns].iterrows()]
     temp = dataframe.copy()
     temp['__plot_value'] = values
+    positive_percentages = {
+        label: (
+            100 * sum(
+                sentiment_group(sentiment) == 'positive'
+                for sentiment in temp.loc[temp['__plot_value'] == label, SENTIMENT_COLUMN]
+            ) / values.count(label)
+            if values.count(label) else 0
+        )
+        for label in labels
+    }
+    labels.sort(key=lambda label: positive_percentages[label])
     return save_categorical_histogram(temp, '__plot_value', title, output_path, ordered_labels=labels, as_percentage=as_percentage, show_counts=show_counts, overlay_counts=overlay_counts)
+
+
+def save_ternary(dataframe, prefix, component_names, title, output_path):
+    columns = [prefix + name for name in component_names]
+    if any(column not in dataframe.columns for column in columns) or SENTIMENT_COLUMN not in dataframe.columns:
+        return False
+    points = []
+    for _, row in dataframe.iterrows():
+        values = [pd.to_numeric(row[column], errors='coerce') for column in columns]
+        if any(pd.isna(value) for value in values):
+            continue
+        total = sum(values)
+        if total <= 0:
+            continue
+        first, second, third = [value / total for value in values]
+        x = 180 + 640 * (second + third / 2)
+        y = 590 - 520 * third
+        points.append(
+            f'<circle cx="{x:.2f}" cy="{y:.2f}" r="5" '
+            f'fill="{sentiment_group(row[SENTIMENT_COLUMN]) and SENTIMENT_COLORS[sentiment_group(row[SENTIMENT_COLUMN])] }" opacity="0.72" />'
+        )
+    if not points:
+        return False
+    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
+<rect width="100%" height="100%" fill="white" />
+<text x="500" y="48" text-anchor="middle" font-size="22">{escape(title)}</text>
+<path d="M 180 590 L 820 590 L 500 70 Z" fill="none" stroke="#39424e" stroke-width="3" />
+<g font-size="16">
+<text x="180" y="625" text-anchor="middle">{escape(component_names[0])}</text>
+<text x="820" y="625" text-anchor="middle">{escape(component_names[1])}</text>
+<text x="500" y="55" text-anchor="middle">{escape(component_names[2])}</text>
+</g>
+{''.join(points)}
+</svg>'''
+    with open(output_path, 'w', encoding='utf-8') as plot_file:
+        plot_file.write(svg)
+    return True
 
 
 def save_wordcloud(dataframe, column, title, output_path):
@@ -195,7 +243,18 @@ numeric_questions = [
 for prefix, filename, left_label, right_label in numeric_questions:
     add_plot(filename, f'{prefix} histogram', lambda path, prefix=prefix, left_label=left_label, right_label=right_label: save_numeric_histogram(df, prefix, prefix, path, left_label=left_label, right_label=right_label, as_percentage=True, overlay_counts=True))
 
-age_order = ['16 - 24', '25 - 34', '34 - 54', '55 - 65', 'over 65']
+ternary_questions = [
+    ('3.1 The experience you shared relates to...', ['The past', 'The future', 'The present'], 'triangle_3_1.svg'),
+    ('3.2 The experience you shared relates to...', ['Your country', 'Europe', 'Your region'], 'triangle_3_2.svg'),
+    ('3.3 In the experience you shared, democracy shows up as...', ['I want to take action', 'I want politicians to take action', 'I want to be left alone '], 'triangle_3_3.svg'),
+    ('3.4 In the experience you shared, your concern is...', ['Everything is changing ', 'We move backwards', 'Nothing changes'], 'triangle_3_4.svg'),
+]
+for prefix, components, filename in ternary_questions:
+    add_plot(filename, f'{prefix} ternary plot',
+             lambda path, prefix=prefix, components=components: save_ternary(
+                 df, prefix + '_', components, prefix, path))
+
+age_order = ['Under 16 years old','16 - 24', '25 - 34', '34 - 54', '55 - 65', 'over 65']
 add_plot('histogram_6_3.svg', '6.3 Experience frequency histogram', lambda path: save_categorical_histogram(df, '6.3 The experience you described was...', '6.3 The experience you described was...', path, ['not sure', 'a one time occurrence', 'rare but it happens from time to time', 'somewhat common', 'very common'], as_percentage=True, show_counts=True, overlay_counts=True))
 add_plot('histogram_6_4.svg', '6.4 Experience origin histogram', lambda path: save_one_hot_histogram(df, country_prefix, country_prefix, path, as_percentage=True, show_counts=True, overlay_counts=True))
 add_plot('histogram_6_6.svg', '6.6 Age histogram', lambda path: save_categorical_histogram(df, '6.6 I am ...', '6.6 I am ...', path, age_order, as_percentage=True, show_counts=True, overlay_counts=True))
@@ -220,9 +279,10 @@ for story in all_story_records:
 
 original_content_column = '1. Please describe a recent experience of you in our society: Something that is important to you and you would tell a good friend. Share your experience here in a couple of sentences. The experience can be positive or negative. There are no right or wrong answers.'
 original_title_column = '1.1 What title would you give your experience?'
-original_stories = original_df.set_index('id').to_dict('index') if 'id' in original_df.columns else {}
 generated_date = date.today().isoformat()
 with open(os.path.join(output_dir, 'stories.md'), 'w', encoding='utf-8') as report:
+    report.write('![Storyboard header](../images/Header.png)\n\n')
+    report.write('![Eurosense logo](../images/LOGO%20EUROSENSE_POWERED.png)\n\n')
     report.write(f'Storyboard\n\nGenerated on: {generated_date}\n\n')
     report.write(f"Selected categories: {', '.join(selected_categories) if selected_categories else 'All'}  \n")
     report.write(f"Selected countries: {', '.join(selected_countries) if selected_countries else 'All'}  \n")
@@ -230,6 +290,7 @@ with open(os.path.join(output_dir, 'stories.md'), 'w', encoding='utf-8') as repo
     report.write('# Story summary\n\n')
     report.write(f'Unique stories found: {len(story_ids)}\n\n')
     report.write(f'Total number of category assignments: {sum(cat_counts.values())}\n\n')
+    report.write('<div style="page-break-after: always;"></div>')
     report.write('# Categories sorted by story count:\n\n')
     for category, count in sorted_cats:
         report.write(f'{category}: {count} stories\n\n')
@@ -247,11 +308,10 @@ with open(os.path.join(output_dir, 'stories.md'), 'w', encoding='utf-8') as repo
     for story in sorted(story_indexed, key=lambda item: item['id']):
         report.write(f"## {story['id']}. {story['Title']}\n\n{markdown_line_breaks(story['Content'])}\n\n")
         row = story['row']
-        original = original_stories.get(story_value(row, 'id'))
-        language = story_value(original, 'meta_selected_language') if original else ''
-        if original and str(language).lower() not in ('', 'en', 'english'):
-            report.write(f'<u>Original title ({language})</u> : {story_value(original, original_title_column)}\n\n')
-            report.write(f'<u>Original content ({language})</u> :\n\n{markdown_line_breaks(story_value(original, original_content_column))}\n\n')
+        language = story_value(row, 'meta_selected_language')
+        if str(language).lower() not in ('', 'en', 'english'):
+            report.write(f'<u>Original title ({language})</u> : {story_value(row, original_title_column)}\n\n')
+            report.write(f'<u>Original content ({language})</u> :\n\n{markdown_line_breaks(story_value(row, original_content_column))}\n\n')
         metadata = [
             ('Origin', ', '.join(column[len(country_prefix):] for column in df.columns if column.startswith(country_prefix) and row.get(column) == 1)),
             ('Language', story_value(row, 'meta_selected_language')),
@@ -264,7 +324,7 @@ with open(os.path.join(output_dir, 'stories.md'), 'w', encoding='utf-8') as repo
             ('The experience was', story_value(row, SENTIMENT_COLUMN)),
         ]
         for label, value in metadata:
-            report.write(f'<u>{label}</u> : {markdown_line_breaks(value)}\n\n')
+            report.write(f'<u>{label}</u> : {markdown_line_breaks(value)}  \n')
         key = (story['Title'], story['Content'])
         report.write(f'<u>This story also appears in</u> : {", ".join(story_categories.get(key, []))}\n\n')
 
