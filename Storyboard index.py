@@ -9,8 +9,8 @@ from html import escape
 import pandas as pd
 
 stories = "../GitClone-stories"
-#file_path = stories + "/2026.06.08/CSVExport-2026.06.08_translated.csv"
-file_path = "/mnt/chromeos/shared/GoogleDrive/SharedDrives/PROGETTI VARI/R extraction of stories/Protein transition/FoodRelatedStories.csv"
+file_path = stories + "/2026.06.08/CSVExport-2026.06.08_translated.csv"
+#file_path = "/mnt/chromeos/shared/GoogleDrive/SharedDrives/PROGETTI VARI/R extraction of stories/Protein transition/FoodRelatedStories.csv"
 output_dir = "storyboard_output"
 
 df = pd.read_csv(file_path)
@@ -18,14 +18,34 @@ df = pd.read_csv(file_path)
 selected_categories = []
 selected_countries = []
 selected_ids = []
+selected_3_1_corners = []
 category_prefix = '1.2 What you described relates mainly to...(pick up to three)_'
 country_prefix = '6.4 My experience is from..._'
+corner_3_1_prefix = '3.1 The experience you shared relates to..._'
+corner_3_1_columns = {
+    corner: f'{corner_3_1_prefix}{corner}'
+    for corner in ('The past', 'The future', 'The present')
+}
 
 category_columns = [f'{category_prefix}{category}' for category in selected_categories if f'{category_prefix}{category}' in df.columns]
 if selected_categories and category_columns:
     df = df.loc[df[category_columns].eq(1).any(axis=1)].copy()
 elif selected_categories:
     raise ValueError(f'No selected categories found: {selected_categories}')
+if selected_3_1_corners:
+    invalid_corners = [corner for corner in selected_3_1_corners if corner not in corner_3_1_columns]
+    if invalid_corners:
+        raise ValueError(f'Unknown 3.1 corners: {invalid_corners}')
+    missing_columns = [column for column in corner_3_1_columns.values() if column not in df.columns]
+    if missing_columns:
+        raise ValueError(f'Missing 3.1 corner columns: {missing_columns}')
+    corner_scores = df[list(corner_3_1_columns.values())].apply(pd.to_numeric, errors='coerce')
+    highest_score = corner_scores.max(axis=1)
+    selected_rows = pd.concat(
+        [corner_scores[column].eq(highest_score) for corner, column in corner_3_1_columns.items() if corner in selected_3_1_corners],
+        axis=1,
+    ).any(axis=1)
+    df = df.loc[selected_rows].copy()
 country_columns = [f'{country_prefix}{country}' for country in selected_countries if f'{country_prefix}{country}' in df.columns]
 if selected_countries and country_columns:
     df = df.loc[df[country_columns].eq(1).any(axis=1)].copy()
@@ -183,6 +203,7 @@ def save_ternary(dataframe, prefix, component_names, title, output_path):
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="700" viewBox="0 0 1000 700">
 <rect width="100%" height="100%" fill="white" />
 <text x="500" y="48" text-anchor="middle" font-size="22">{escape(title)}</text>
+<g transform="translate(0 15)">
 <path d="M 180 590 L 820 590 L 500 70 Z" fill="none" stroke="#39424e" stroke-width="3" />
 <g font-size="16">
 <text x="180" y="625" text-anchor="middle">{escape(component_names[0])}</text>
@@ -190,6 +211,7 @@ def save_ternary(dataframe, prefix, component_names, title, output_path):
 <text x="500" y="55" text-anchor="middle">{escape(component_names[2])}</text>
 </g>
 {''.join(points)}
+</g>
 </svg>'''
     with open(output_path, 'w', encoding='utf-8') as plot_file:
         plot_file.write(svg)
@@ -244,10 +266,10 @@ for prefix, filename, left_label, right_label in numeric_questions:
     add_plot(filename, f'{prefix} histogram', lambda path, prefix=prefix, left_label=left_label, right_label=right_label: save_numeric_histogram(df, prefix, prefix, path, left_label=left_label, right_label=right_label, as_percentage=True, overlay_counts=True))
 
 ternary_questions = [
-    ('3.1 The experience you shared relates to...', ['The past', 'The future', 'The present'], 'triangle_3_1.svg'),
-    ('3.2 The experience you shared relates to...', ['Your country', 'Europe', 'Your region'], 'triangle_3_2.svg'),
-    ('3.3 In the experience you shared, democracy shows up as...', ['I want to take action', 'I want politicians to take action', 'I want to be left alone '], 'triangle_3_3.svg'),
-    ('3.4 In the experience you shared, your concern is...', ['Everything is changing ', 'We move backwards', 'Nothing changes'], 'triangle_3_4.svg'),
+    ('3.1 The experience you shared relates to...', ['The future', 'The present', 'The past'], 'triangle_3_1.svg'),
+    ('3.2 The experience you shared relates to...', ['Europe', 'Your region', 'Your country'], 'triangle_3_2.svg'),
+    ('3.3 In the experience you shared, democracy shows up as...', ['I want politicians to take action', 'I want to be left alone ', 'I want to take action'], 'triangle_3_3.svg'),
+    ('3.4 In the experience you shared, your concern is...', ['We move backwards', 'Nothing changes', 'Everything is changing '], 'triangle_3_4.svg'),
 ]
 for prefix, components, filename in ternary_questions:
     add_plot(filename, f'{prefix} ternary plot',
@@ -285,6 +307,7 @@ with open(os.path.join(output_dir, 'stories.md'), 'w', encoding='utf-8') as repo
     report.write('![Eurosense logo](../images/LOGO%20EUROSENSE_POWERED.png)\n\n')
     report.write(f'Storyboard\n\nGenerated on: {generated_date}\n\n')
     report.write(f"Selected categories: {', '.join(selected_categories) if selected_categories else 'All'}  \n")
+    report.write(f"Selected 3.1 dominant corners: {', '.join(selected_3_1_corners) if selected_3_1_corners else 'All'}  \n")
     report.write(f"Selected countries: {', '.join(selected_countries) if selected_countries else 'All'}  \n")
     report.write(f"Selected story IDs: {', '.join(selected_ids) if selected_ids else 'All'}\n\n")
     report.write('# Story summary\n\n')
